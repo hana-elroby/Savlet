@@ -9,6 +9,8 @@ import '../bloc/analytics_bloc.dart';
 import '../bloc/analytics_state.dart';
 import '../bloc/expense_bloc.dart';
 import '../bloc/expense_state.dart';
+import '../../transactions/bloc/transaction_bloc.dart';
+import '../../transactions/bloc/transaction_state.dart';
 
 class HomeDashboardHeader extends StatefulWidget {
   final VoidCallback onNotificationsTap;
@@ -49,6 +51,8 @@ class _HomeDashboardHeaderState extends State<HomeDashboardHeader> {
           builder: (context, analytics) {
             return BlocBuilder<ExpenseBloc, ExpenseState>(
               builder: (context, expenseState) {
+                return BlocBuilder<TransactionBloc, TransactionState>(
+                  builder: (context, txState) {
                 final auth = AuthApiService.instance;
                 final displayName =
                     auth.currentUser?.displayName ?? userState.name;
@@ -58,6 +62,11 @@ class _HomeDashboardHeaderState extends State<HomeDashboardHeader> {
                 var total = analytics.totalAmount;
                 if (total <= 0 && expenseState is ExpenseLoaded) {
                   total = expenseState.totalExpenses;
+                }
+                if (total <= 0 && txState.transactions.isNotEmpty) {
+                  total = txState.transactions
+                      .where((t) => t.isExpense)
+                      .fold(0.0, (sum, t) => sum + t.amount);
                 }
 
                 return Column(
@@ -109,6 +118,8 @@ class _HomeDashboardHeaderState extends State<HomeDashboardHeader> {
                       onReminders: widget.onReminders,
                     ),
                   ],
+                );
+                  },
                 );
               },
             );

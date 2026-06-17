@@ -44,7 +44,7 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
     _wsSubscription = ws.analyticsStream.listen((payload) {
       // Backend sent analytics_update — refresh expenses from backend
       print('📊 [ExpenseBloc] Real-time update received, refreshing...');
-      add(const LoadExpenses());
+      add(const LoadExpenses(silent: true));
     });
   }
 
@@ -168,7 +168,7 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
       if (result.isSuccess) {
         print('✅ Transaction synced to backend: ${event.expense.title}');
         // Refresh from backend so UI shows the saved data
-        add(const LoadExpenses());
+        add(const LoadExpenses(silent: true));
         // Trigger analytics refresh immediately
         Future.delayed(const Duration(milliseconds: 500), () {
           AnalyticsBloc.instance?.refresh();
@@ -225,7 +225,12 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
 
   Future<void> _onLoadExpenses(
       LoadExpenses event, Emitter<ExpenseState> emit) async {
-    emit(const ExpenseLoading());
+    final cachedExpenses =
+        state is ExpenseLoaded ? (state as ExpenseLoaded).expenses : null;
+
+    if (!event.silent || cachedExpenses == null) {
+      emit(const ExpenseLoading());
+    }
 
     try {
       final isLoggedIn = await AuthApiService.instance.isAuthenticated();
@@ -278,10 +283,19 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
 
       // Fallback to local storage
       final local = await _loadLocal();
-      emit(ExpenseLoaded(local));
-      print('📦 Loaded ${local.length} expenses from local storage');
+      if (local.isNotEmpty || cachedExpenses == null) {
+        emit(ExpenseLoaded(local));
+        print('📦 Loaded ${local.length} expenses from local storage');
+      } else {
+        emit(ExpenseLoaded(cachedExpenses));
+        print('📦 Kept ${cachedExpenses.length} cached expenses after load failure');
+      }
     } catch (e) {
-      emit(ExpenseError(e.toString()));
+      if (cachedExpenses != null) {
+        emit(ExpenseLoaded(cachedExpenses));
+      } else {
+        emit(ExpenseError(e.toString()));
+      }
     }
   }
 
@@ -291,7 +305,8 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
     await _storage.delete(_storageKey);
   }
 
-  void refreshExpenses() => add(const LoadExpenses());
+  void refreshExpenses({bool silent = true}) =>
+      add(LoadExpenses(silent: silent));
   void clearAllExpenses() => add(ClearAllExpenses());
 
   /// Rebuild CategoryDataStore from a list of expenses (called after backend load)

@@ -64,22 +64,42 @@ class TransactionModel extends Equatable {
   // From API response
   factory TransactionModel.fromMap(Map<String, dynamic> map) {
     return TransactionModel(
-      id: map['_id'] ?? '',
-      text: map['text'],
-      voicePath: map['voice_path'],
-      ocrPath: map['OCR_path'],
+      id: map['_id']?.toString() ?? '',
+      text: map['text']?.toString(),
+      voicePath: map['voice_path']?.toString(),
+      ocrPath: map['OCR_path']?.toString(),
       price: (map['price'] as num?)?.toDouble() ?? 0,
       quantity: (map['quantity'] as num?)?.toInt() ?? 1,
-      categoryId: map['category'] is Map ? map['category']['_id'] : map['category'],
-      categoryName: map['category'] is Map ? map['category']['name'] : null,
-      userId: map['user'] is Map ? map['user']['_id'] : (map['user'] ?? ''),
-      items: (map['items'] as List?)
-              ?.map((item) => TransactionItem.fromMap(item as Map<String, dynamic>))
-              .toList() ??
-          [],
-      createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
-      updatedAt: map['updatedAt'] != null ? DateTime.tryParse(map['updatedAt']) : null,
+      categoryId: map['category'] is Map
+          ? map['category']['_id']?.toString()
+          : map['category']?.toString(),
+      categoryName: map['category'] is Map
+          ? map['category']['name']?.toString()
+          : null,
+      userId: map['user'] is Map
+          ? map['user']['_id']?.toString() ?? ''
+          : (map['user']?.toString() ?? ''),
+      items: _parseItems(map['items']),
+      createdAt: DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt: map['updatedAt'] != null
+          ? DateTime.tryParse(map['updatedAt'].toString())
+          : null,
     );
+  }
+
+  static List<TransactionItem> _parseItems(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw.map((item) {
+      if (item is Map<String, dynamic>) {
+        return TransactionItem.fromMap(item);
+      }
+      if (item is Map) {
+        return TransactionItem.fromMap(Map<String, dynamic>.from(item));
+      }
+      final id = item?.toString() ?? '';
+      return TransactionItem(id: id);
+    }).toList();
   }
 
   // To map for API

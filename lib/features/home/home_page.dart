@@ -60,17 +60,7 @@ class HomePage extends StatelessWidget {
 
   Widget build(BuildContext context) {
 
-    return MultiBlocProvider(
-
-      providers: [
-
-        BlocProvider(create: (_) => ExpenseBloc()),
-
-        BlocProvider.value(value: context.read<AnalyticsBloc>()),
-
-      ],
-
-      child: BlocListener<ExpenseBloc, ExpenseState>(
+    return BlocListener<ExpenseBloc, ExpenseState>(
 
         listenWhen: (prev, curr) {
 
@@ -86,13 +76,13 @@ class HomePage extends StatelessWidget {
 
           context.read<TransactionBloc>().add(const LoadTransactions());
 
+          AnalyticsBloc.instance?.refresh();
+
         },
 
         child: const _HomePageContent(),
 
-      ),
-
-    );
+      );
 
   }
 
@@ -227,6 +217,10 @@ class _HomePageContentState extends State<_HomePageContent>
         _offersError = products.isEmpty ? 'No deals yet — pull to refresh' : null;
 
       });
+
+      if (force || products.isNotEmpty) {
+        _loadUnreadNotifications();
+      }
 
     } on DioException catch (e) {
 

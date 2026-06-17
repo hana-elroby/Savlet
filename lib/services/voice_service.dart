@@ -17,10 +17,30 @@ class VoiceService {
   bool _isInitialized = false;
   bool _isListening = false;
   bool _hasReceivedResult = false; // Track if we got any result
+  Function(String)? _activeOnError;
 
   // Getters
   bool get isInitialized => _isInitialized;
   bool get isListening => _isListening;
+
+  Future<bool> hasArabicLocale() async {
+    if (!_isInitialized) {
+      final initialized = await initialize();
+      if (!initialized) return false;
+    }
+
+    try {
+      final locales = await _speechToText.locales();
+      return locales.any((locale) =>
+          locale.localeId.startsWith('ar') ||
+          locale.localeId.contains('ar_') ||
+          locale.name.toLowerCase().contains('arabic') ||
+          locale.name.toLowerCase().contains('عربي'));
+    } catch (e) {
+      print('❌ Error checking Arabic locale: $e');
+      return false;
+    }
+  }
 
   // Initialize speech recognition with comprehensive locale detection
   Future<bool> initialize() async {
@@ -40,8 +60,15 @@ class VoiceService {
       final available = await _speechToText.initialize(
         onError: (error) {
           print('❌ Speech error: ${error.errorMsg}');
+          _isListening = false;
+          _activeOnError?.call('خطأ في الميكروفون: ${error.errorMsg}');
         },
-        onStatus: (status) => print('📊 Speech status: $status'),
+        onStatus: (status) {
+          print('📊 Speech status: $status');
+          if (status == 'done' || status == 'notListening') {
+            _isListening = false;
+          }
+        },
         debugLogging: true,
       );
 
@@ -106,6 +133,11 @@ class VoiceService {
       }
     }
 
+    if (_isListening && !_speechToText.isListening) {
+      print('♻️ Speech state was stale, resetting listener state');
+      _isListening = false;
+    }
+
     if (_isListening) {
       print('⚠️ Already listening');
       return;
@@ -114,6 +146,7 @@ class VoiceService {
     try {
       _isListening = true;
       _hasReceivedResult = false;
+      _activeOnError = onError;
       print('🎤 Starting voice recognition...');
       
       // Request microphone permission
@@ -157,6 +190,11 @@ class VoiceService {
         localeId = englishLocale.localeId;
         print('⚠️ No Arabic locale found! Using: $localeId');
         print('⚠️ يرجى تحميل اللغة العربية من إعدادات الجهاز');
+        onError(
+          'الميكروفون سامع، لكن الإيموليتر لا يحتوي على لغة عربية للتعرف على الكلام. أضيفي Arabic (Egypt) من إعدادات الجهاز أو جرّبي بالإنجليزي: paid 50 pounds coffee.',
+        );
+        _isListening = false;
+        return;
       }
       
       print('🌍 Using locale: $localeId');
@@ -166,6 +204,7 @@ class VoiceService {
         onResult: (result) {
           final recognizedWords = result.recognizedWords;
           print('🎯 Voice result: "$recognizedWords"');
+          _isListening = _speechToText.isListening;
           
           if (recognizedWords.isNotEmpty) {
             _hasReceivedResult = true;
@@ -228,10 +267,12 @@ class VoiceService {
     try {
       await _speechToText.stop();
       _isListening = false;
+      _activeOnError = null;
       print('🛑 Stopped voice listening');
     } catch (e) {
       print('❌ Error stopping speech recognition: $e');
       _isListening = false;
+      _activeOnError = null;
     }
   }
 

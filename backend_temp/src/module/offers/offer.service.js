@@ -4,6 +4,8 @@
 import NodeCache from "node-cache";
 import { Types } from "mongoose";
 import { Transactions } from "../../DB/models/transactions.model.js";
+import { Notification } from "../../DB/models/notification.model.js";
+import { createUserNotification } from "../notifications/notification.service.js";
 import { searchAllMarketplaces, searchAmazonEg } from "./providers/index.js";
 
 const WARM_CATEGORIES = ["Shopping", "Food & Drink", "Electronics"];
@@ -205,6 +207,13 @@ export async function getPersonalizedOffers(userIdHex) {
     offersCache.set(userCacheKey, result);
   }
 
+  const primaryCategory = toFetch[0]?.category || "Shopping";
+  await notifyNewOffersIfNeeded(userId, {
+    categoryName: primaryCategory,
+    products,
+    fromCache: false,
+  });
+
   return result;
 }
 
@@ -231,6 +240,35 @@ function buildOffersResponse(perCategory, products, defaultedCategory) {
   };
 }
 
+async function notifyNewOffersIfNeeded(userId, { categoryName, products, fromCache }) {
+  if (fromCache || !products?.length) return;
+
+  const category = categoryName || "Shopping";
+  const day = new Date().toISOString().slice(0, 10);
+  const referenceId = `offers:${category}:${day}`;
+
+  const existing = await Notification.findOne({
+    user: userId,
+    type: "offer",
+    referenceId,
+  }).select("_id");
+
+  if (existing) return;
+
+  const count = products.length;
+  const sample = products[0]?.displayTitle || products[0]?.title || "new deals";
+  const categoryLabel = normalizeCategoryName(category);
+
+  await createUserNotification(userId, {
+    title: "New deals for you",
+    body: `We found ${count} offer${count === 1 ? "" : "s"} in ${categoryLabel} — ${sample}`,
+    type: "offer",
+    referenceId,
+  });
+
+  console.log(`[OFFERS] Offer notification created for user ${userId} (${category})`);
+}
+
 export async function getOffersPreview(userIdHex) {
   const previewKey = `preview-v3:${userIdHex}`;
   const previewHit = offersCache.get(previewKey);
@@ -255,6 +293,12 @@ export async function getOffersPreview(userIdHex) {
   if (result.products.length) {
     offersCache.set(previewKey, result);
   }
+
+  await notifyNewOffersIfNeeded(userId, {
+    categoryName: primary.category,
+    products: result.products,
+    fromCache: false,
+  });
 
   return result;
 }

@@ -150,6 +150,11 @@ class VoiceApiService {
   String? _parseServerError(String body) {
     try {
       final data = jsonDecode(body);
+      final detail = data['detail'];
+      if (detail is Map<String, dynamic>) {
+        final message = detail['message'];
+        if (message is String && message.isNotEmpty) return message;
+      }
       final error = data['error'];
       if (error is Map<String, dynamic>) {
         final message = error['message'];

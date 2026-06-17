@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import 'dart:io';
 import '../../services/voice_api_service.dart';
+import '../../features/home/bloc/analytics_bloc.dart';
 import '../../features/home/bloc/expense_bloc.dart';
 import '../../features/home/bloc/expense_event.dart';
 import '../../core/models/expense.dart';
@@ -46,8 +47,7 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
   static const _border = Color(0xFFE8EDF5);
 
   static const _processingSteps = [
-    'Uploading audio',
-    'Transcribing speech',
+    'Analyzing speech',
     'Detecting amounts',
     'Matching categories',
     'Preparing results',
@@ -60,8 +60,19 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
   String? _audioPath;
   int _processingStep = 0;
   Timer? _processingStepTimer;
+  Timer? _silenceWarningTimer;
+  bool _silenceWarned = false;
+  double _soundLevel = 0;
+  double _peakMicLevel = 0;
+  DateTime? _recordingStartedAt;
 
   List<Map<String, dynamic>> _transactions = [];
+
+  int get _recordingAgeMs {
+    final startedAt = _recordingStartedAt;
+    if (startedAt == null) return 0;
+    return DateTime.now().difference(startedAt).inMilliseconds;
+  }
 
   @override
   void initState() {
@@ -79,8 +90,9 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
   @override
   void dispose() {
     _processingStepTimer?.cancel();
-    _pulseController.dispose();
+    _silenceWarningTimer?.cancel();
     _recorderController.dispose();
+    _pulseController.dispose();
     _transcriptionController.dispose();
     for (final c in _categoryControllers) {
       c.dispose();
@@ -117,7 +129,10 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
 
   String get _statusLabel {
     if (_isProcessing) return 'Analyzing your voice…';
-    if (_isRecording) return 'Listening — tap stop when done';
+    if (_isRecording) {
+      if (_recognizedText.isNotEmpty) return _recognizedText;
+      return 'Listening — tap stop when done';
+    }
     if (_recognizedText.isNotEmpty && !_showResults) return _recognizedText;
     return 'Tap and say your expense';
   }
@@ -194,31 +209,102 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
     return false;
   }
 
+  void _cancelSilenceWatch() {
+    _silenceWarningTimer?.cancel();
+    _silenceWarningTimer = null;
+    _silenceWarned = false;
+  }
+
+  void _startSilenceWatch() {
+    _cancelSilenceWatch();
+    _soundLevel = 0;
+    _peakMicLevel = 0;
+    _silenceWarningTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (!mounted || !_isRecording) return;
+      if (_recognizedText.isNotEmpty) return;
+
+      final waves = _recorderController.waveData;
+      if (waves.isNotEmpty) {
+        final peak = waves.reduce((a, b) => a > b ? a : b);
+        if (peak > _peakMicLevel) _peakMicLevel = peak;
+        _soundLevel = peak;
+        if (mounted) setState(() {});
+      }
+
+      if (_soundLevel < 0.08 && !_silenceWarned && _recordingAgeMs > 2500) {
+        _silenceWarned = true;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'لم يُسمع صوت. تأكدي أن ميكروفون الويندوز شغال، وعلى الإيموليتر: ⋮ → Microphone → Virtual microphone uses host audio input.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    });
+  }
+
   Future<void> _startRecording() async {
     try {
       if (!await _ensureMicrophonePermission()) return;
 
+      setState(() {
+        _showResults = false;
+        _transactions = [];
+        _recognizedText = '';
+        _soundLevel = 0;
+        _peakMicLevel = 0;
+      });
+      _disposeResultControllers();
+
+      print('🎙️ Using audio upload recording flow');
+      final nativeMicOk = await _recorderController.checkPermission();
+      if (!nativeMicOk) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Microphone permission was denied. Enable it in app Settings.',
+            ),
+          ),
+        );
+        return;
+      }
+
       final directory = await getTemporaryDirectory();
-      _audioPath = '${directory.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      
-      // Keep iOS on standard AAC settings; very low sample rates can create
-      // header-only files on the simulator.
+      _audioPath =
+          '${directory.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
       await _recorderController.record(
         path: _audioPath,
         androidEncoder: AndroidEncoder.aac,
         androidOutputFormat: AndroidOutputFormat.mpeg4,
         iosEncoder: IosEncoder.kAudioFormatMPEG4AAC,
-        bitRate: Platform.isIOS ? 128000 : 64000,
-        sampleRate: Platform.isIOS ? 44100 : 16000,
+        bitRate: 128000,
+        sampleRate: 44100,
       );
-      
-      setState(() {
-        _isRecording = true;
-        _recognizedText = '';
-      });
+
+      if (!_recorderController.isRecording) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not start recording. On emulator: Extended Controls → Microphone → enable host mic.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      _recordingStartedAt = DateTime.now();
+      setState(() => _isRecording = true);
       _pulseController.repeat(reverse: true);
+      _startSilenceWatch();
+      print('✅ Audio recording started');
     } catch (e) {
       print('Error starting recording: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error starting recording: $e')),
       );
@@ -245,38 +331,45 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
 
   Future<void> _stopRecording() async {
     try {
+      _cancelSilenceWatch();
+      final recordingDurationMs = _recordingAgeMs;
       final path = await _recorderController.stop();
-      
+      _recordingStartedAt = null;
+
       setState(() {
         _isRecording = false;
         _isProcessing = true;
         _recognizedText = '';
       });
       _startProcessingSteps();
-      
-      if (path != null && path.isNotEmpty) {
-        final audioFile = File(path);
-        final fileSize = await audioFile.length();
-        if (fileSize < 1024) {
-          _stopProcessingSteps();
-          if (!mounted) return;
-          setState(() {
-            _isProcessing = false;
-            _recognizedText = 'Recording was too short. Please try again and speak for at least one second.';
-          });
-          return;
-        }
 
-        // Send directly to server (server handles Arabic better)
-        await _analyzeAudioFile(audioFile);
-      } else {
+      if (path == null || path.isEmpty) {
         _stopProcessingSteps();
         if (!mounted) return;
         setState(() {
           _isProcessing = false;
           _recognizedText = 'Recording failed. Please try again.';
         });
+        return;
       }
+
+      final audioFile = File(path);
+      final fileSize = await audioFile.length();
+      print('⏱️ Recording duration: ${recordingDurationMs}ms');
+      print('📊 Recorded file size: $fileSize bytes');
+      print('🎚️ Peak mic level while recording: $_peakMicLevel');
+      if (fileSize < 1024) {
+        _stopProcessingSteps();
+        if (!mounted) return;
+        setState(() {
+          _isProcessing = false;
+          _recognizedText =
+              'التسجيل قصير جداً. تكلمي 2–3 ثواني على الأقل.';
+        });
+        return;
+      }
+
+      await _analyzeAudioFile(audioFile);
     } catch (e) {
       print('Error stopping recording: $e');
       setState(() {
@@ -291,85 +384,27 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
     try {
       print('📤 Sending audio file to server: ${audioFile.path}');
       print('📊 File size: ${await audioFile.length()} bytes');
-      
+
       final result = await _voiceApiService.analyzeVoice(audioFile);
-      
+
       _stopProcessingSteps();
-      setState(() {
-        _isProcessing = false;
-      });
-      
+      setState(() => _isProcessing = false);
+
       if (result.isSuccess && result.data != null) {
         print('✅ Server response received');
-        print('📦 Full response data: ${result.data}');
-        
-        // Extract transcription
         final text = result.data['data']?['transcription'] ?? '';
-        
-        // Extract ALL transactions from server
-        final transactionsList = result.data['data']?['analysis']?['transactions'] as List?;
-        
+        final transactionsList =
+            result.data['data']?['analysis']?['transactions'] as List?;
         print('📝 Transcription: "$text"');
         print('📊 Found ${transactionsList?.length ?? 0} transactions');
-        
-        final clientItemized = _splitItemizedVoiceTransactions(text);
-
-        if (transactionsList != null && transactionsList.isNotEmpty) {
-          // Prefer server (LLM/rule engine); client split only if server missed items
-          final useClientSplit = transactionsList.length == 1 &&
-              clientItemized.length > 1;
-
-          final source = useClientSplit ? clientItemized : transactionsList;
-
-          _transactions = source.map((t) {
-            final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
-            final rawCategory = t['category'] as String? ?? 'Other';
-            final segment = (t['extracted_text'] as String?) ??
-                (t['original'] is Map ? (t['original'] as Map)['extracted_text'] as String? : null) ??
-                text;
-
-            final description = useClientSplit
-                ? (t['description'] as String? ?? '')
-                : _transactionDescription(
-                    transaction: t,
-                    fullTranscription: segment,
-                    fallbackCategory: rawCategory,
-                  );
-
-            final mappedCategory = _mapServerCategoryToApp(rawCategory);
-            final category = segment.isNotEmpty
-                ? _inferCategoryFromText(segment, fallback: mappedCategory)
-                : mappedCategory;
-
-            return {
-              'amount': amount,
-              'category': category,
-              'description': description,
-              'original': t,
-            };
-          }).toList();
-
-          setState(() {
-            _recognizedText = text;
-            _showResults = true;
-          });
-          _initResultControllers();
-        } else if (clientItemized.isNotEmpty) {
-          _transactions = clientItemized;
-          setState(() {
-            _recognizedText = text;
-            _showResults = true;
-          });
-          _initResultControllers();
-        } else {
-          setState(() {
-            _recognizedText = text.isNotEmpty ? text : 'No transactions detected';
-          });
-        }
+        _applyAnalysisResult(text, transactionsList);
       } else {
         print('❌ Server returned error');
         setState(() {
-          _recognizedText = 'Analysis failed: ${result.message ?? "Unknown error"}';
+          _showResults = false;
+          _transactions = [];
+          _recognizedText =
+              _humanizeVoiceError(result.message ?? 'Unknown error');
         });
       }
     } catch (e) {
@@ -380,6 +415,112 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
       });
       print('❌ Error analyzing audio: $e');
     }
+  }
+
+  void _applyAnalysisResult(String text, List? transactionsList) {
+    final clientItemized = _splitItemizedVoiceTransactions(text);
+
+    if (transactionsList != null && transactionsList.isNotEmpty) {
+      final useClientSplit =
+          transactionsList.length == 1 && clientItemized.length > 1;
+      final source = useClientSplit ? clientItemized : transactionsList;
+
+      _transactions = source.map((t) {
+        final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
+        final rawCategory = t['category'] as String? ?? 'Other';
+        final segment = (t['extracted_text'] as String?) ??
+            (t['original'] is Map
+                ? (t['original'] as Map)['extracted_text'] as String?
+                : null) ??
+            text;
+
+        final description = useClientSplit
+            ? (t['description'] as String? ?? '')
+            : _transactionDescription(
+                transaction: t,
+                fullTranscription: segment,
+                fallbackCategory: rawCategory,
+              );
+
+        final mappedCategory = _mapServerCategoryToApp(rawCategory);
+        final category = segment.isNotEmpty
+            ? _inferCategoryFromText(segment, fallback: mappedCategory)
+            : mappedCategory;
+
+        return {
+          'amount': amount,
+          'category': category,
+          'description': description,
+          'original': t,
+        };
+      }).toList();
+
+      setState(() {
+        _recognizedText = text;
+        _showResults = true;
+      });
+      _initResultControllers();
+    } else if (clientItemized.isNotEmpty) {
+      _transactions = clientItemized;
+      setState(() {
+        _recognizedText = text;
+        _showResults = true;
+      });
+      _initResultControllers();
+    } else {
+      setState(() {
+        _recognizedText = text.isNotEmpty
+            ? 'Transcribed: "$text" — but no expense amounts were detected. Try: "دفعت 50 جنيه قهوة"'
+            : 'No transactions detected. Speak an amount and item, e.g. "Paid 120 EGP for coffee".';
+      });
+    }
+  }
+
+  Future<void> _analyzeRecognizedText(String text) async {
+    try {
+      print('📤 Sending recognized text to server: "$text"');
+
+      final result = await _voiceApiService.analyzeText(text);
+
+      _stopProcessingSteps();
+      setState(() => _isProcessing = false);
+
+      if (result.isSuccess && result.data != null) {
+        print('✅ Server response received');
+        final transactionsList =
+            result.data['data']?['analysis']?['transactions'] as List?;
+        _applyAnalysisResult(text, transactionsList);
+      } else {
+        print('❌ Server returned error');
+        setState(() {
+          _showResults = false;
+          _transactions = [];
+          _recognizedText =
+              _humanizeVoiceError(result.message ?? 'Unknown error');
+        });
+      }
+    } catch (e) {
+      _stopProcessingSteps();
+      setState(() {
+        _isProcessing = false;
+        _recognizedText = 'Error: $e';
+      });
+      print('❌ Error analyzing text: $e');
+    }
+  }
+
+  String _humanizeVoiceError(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('no spoken audio') ||
+        lower.contains('no speech detected')) {
+      return 'الميكروفون لم يلتقط صوتاً. على الإيموليتر: ⋮ → Microphone → Virtual microphone uses host audio input، ثم تكلمي 2–3 ثواني.';
+    }
+    if (lower.contains('could not transcribe') ||
+        lower.contains('transcription_error') ||
+        lower.contains('failed to transcribe')) {
+      return 'وصل التسجيل للسيرفر لكن لم يظهر فيه كلام واضح. تأكدي أن Microphone في الإيموليتر على Virtual microphone uses host audio input، وتكلمي بعد ما تظهر Listening لمدة 3 ثواني.';
+    }
+    return 'فشل تحليل الصوت: $message';
   }
 
   static const _genericItemLabels = {
@@ -795,11 +936,13 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
       print('✅ Added item "${categoryItem.name}" to category "$finalCategory"');
     }
     
-    // Refresh transactions after backend sync (AddExpense handles persistence)
+    // Refresh all related views after backend sync completes
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        context.read<TransactionBloc>().add(const LoadTransactions());
-      }
+      if (!mounted) return;
+      widget.categoryBloc.add(LoadCategories());
+      widget.expenseBloc.refreshExpenses(silent: true);
+      context.read<TransactionBloc>().add(const LoadTransactions());
+      AnalyticsBloc.instance?.refresh();
     });
 
     Navigator.of(context).pop();
@@ -1066,6 +1209,26 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
     );
   }
 
+  Widget _buildListeningWaveform() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(24, (i) {
+        final wave = 0.5 + 0.5 * ((i % 5) / 4);
+        final h = 8.0 + (_soundLevel * 44 * wave);
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: 3,
+          height: h.clamp(8, 52),
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: BoxDecoration(
+            color: _soundLevel > 0.1 ? _navy : const Color(0xFFCBD5E1),
+            borderRadius: BorderRadius.circular(99),
+          ),
+        );
+      }),
+    );
+  }
+
   Widget _buildRecordingView(BuildContext context) {
     return Padding(
       key: const ValueKey('recording'),
@@ -1088,7 +1251,10 @@ class _SimpleVoiceDialogState extends State<SimpleVoiceDialog>
                   child: _isRecording
                       ? AudioWaveforms(
                           enableGesture: false,
-                          size: Size(MediaQuery.sizeOf(context).width - 72, 56),
+                          size: Size(
+                            MediaQuery.sizeOf(context).width - 72,
+                            56,
+                          ),
                           recorderController: _recorderController,
                           waveStyle: WaveStyle(
                             waveColor: _navy,

@@ -79,7 +79,9 @@ class TranscriptionService:
 
             if not text or len(text.strip()) == 0:
                 raise TranscriptionError(
-                    "Could not transcribe audio. Please speak clearly and try again."
+                    "No speech detected in the recording. "
+                    "On Android emulator enable Extended Controls → Microphone → host audio input, "
+                    "then speak clearly for at least 2 seconds."
                 )
 
             text = self._clean_transcription(text)
@@ -96,7 +98,7 @@ class TranscriptionService:
             processing_time = time.time() - start_time
             logger.info(f"Transcription completed in {processing_time:.2f}s, confidence: {confidence:.2f}")
 
-            if content_hash:
+            if content_hash and text and len(text.strip()) >= 3:
                 cache.set(cache_key, {
                     'text': text,
                     'confidence': confidence

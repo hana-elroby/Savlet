@@ -170,19 +170,31 @@ class CategoryDataStore {
   }
 
   CategoryData? findCategory(String name) {
+    final target = name.trim().toLowerCase();
     for (var cat in _mainCategories) {
-      if (cat.name == name) return cat;
+      if (cat.name.trim().toLowerCase() == target) return cat;
     }
     for (var cat in _customCategories) {
-      if (cat.name == name) return cat;
+      if (cat.name.trim().toLowerCase() == target) return cat;
     }
     return null;
   }
 
   void addItemToCategory(String categoryName, CategoryItem item) {
     final category = findCategory(categoryName);
-    category?.addItem(item);
-    _saveData();
+    if (category != null) {
+      category.addItem(item);
+      _saveData();
+      return;
+    }
+
+    final newCategory = CategoryData(
+      name: categoryName,
+      icon: Icons.category,
+      isMain: false,
+    );
+    newCategory.addItem(item);
+    addCustomCategory(newCategory);
   }
 
   void removeItemFromCategory(String categoryName, int itemIndex) {

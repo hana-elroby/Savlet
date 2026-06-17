@@ -151,8 +151,9 @@ def cached_text_analysis(ttl: int = None):
             # Execute function
             result = await func(self, text, *args, **kwargs)
             
-            # Cache result
-            cache.set(cache_key, result, ttl)
+            # Cache only successful analyses — empty results should not replay as "mock data"
+            if getattr(result, "transactions", None):
+                cache.set(cache_key, result, ttl)
             
             return result
         return wrapper

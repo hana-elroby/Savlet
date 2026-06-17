@@ -4,6 +4,12 @@
 import 'api_service.dart';
 import '../models/transaction_model.dart';
 
+Map<String, dynamic> _asMap(dynamic item) {
+  if (item is Map<String, dynamic>) return item;
+  if (item is Map) return Map<String, dynamic>.from(item);
+  throw FormatException('Expected map transaction, got ${item.runtimeType}');
+}
+
 class TransactionApiService {
   static final TransactionApiService instance = TransactionApiService._internal();
   TransactionApiService._internal();
@@ -37,7 +43,7 @@ class TransactionApiService {
       final data = response.getData<Map<String, dynamic>>('data');
       if (data != null) {
         return TransactionApiResult.success(
-          transaction: TransactionModel.fromMap(data),
+          transaction: TransactionModel.fromMap(_asMap(data)),
           message: response.message,
         );
       }
@@ -59,7 +65,7 @@ class TransactionApiService {
       final count = response.getData<int>('count') ?? 0;
 
       final transactions = dataList
-          .map((item) => TransactionModel.fromMap(item as Map<String, dynamic>))
+          .map((item) => TransactionModel.fromMap(_asMap(item)))
           .toList();
 
       return TransactionListResult.success(
@@ -95,7 +101,7 @@ class TransactionApiService {
       final count = response.getData<int>('count') ?? 0;
 
       final transactions = dataList
-          .map((item) => TransactionModel.fromMap(item as Map<String, dynamic>))
+          .map((item) => TransactionModel.fromMap(_asMap(item)))
           .toList();
 
       return TransactionListResult.success(
@@ -128,7 +134,7 @@ class TransactionApiService {
       final data = response.getData<Map<String, dynamic>>('data') ?? response.data;
       if (data != null) {
         return TransactionApiResult.success(
-          transaction: TransactionModel.fromMap(data),
+          transaction: TransactionModel.fromMap(_asMap(data)),
         );
       }
     }
@@ -148,7 +154,7 @@ class TransactionApiService {
       final count = response.getData<int>('count') ?? 0;
 
       final transactions = dataList
-          .map((item) => TransactionModel.fromMap(item as Map<String, dynamic>))
+          .map((item) => TransactionModel.fromMap(_asMap(item)))
           .toList();
 
       return TransactionListResult.success(
@@ -181,7 +187,7 @@ class TransactionApiService {
       final count = response.getData<int>('count') ?? 0;
 
       final transactions = dataList
-          .map((item) => TransactionModel.fromMap(item as Map<String, dynamic>))
+          .map((item) => TransactionModel.fromMap(_asMap(item)))
           .toList();
 
       return TransactionListResult.success(
@@ -211,7 +217,7 @@ class TransactionApiService {
       final data = response.getData<Map<String, dynamic>>('data') ?? response.data;
       if (data != null) {
         return TransactionApiResult.success(
-          transaction: TransactionModel.fromMap(data),
+          transaction: TransactionModel.fromMap(_asMap(data)),
           message: 'Transaction updated',
         );
       }

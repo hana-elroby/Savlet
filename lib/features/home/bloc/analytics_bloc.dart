@@ -138,7 +138,7 @@ class AnalyticsBloc extends Cubit<AnalyticsState> {
       final now = DateTime.now();
       final start = from ?? DateTime(2020, 1, 1);
       final end = to ?? now;
-      final period = 'daily'; // Always daily for zigzag
+      const period = 'daily';
 
       final response = await _api.get('/analytics/by-date', queryParams: {
         'period': period,
@@ -146,22 +146,44 @@ class AnalyticsBloc extends Cubit<AnalyticsState> {
         'endDate': end.toIso8601String().split('T')[0],
       });
 
+      final analysisOverTime = <String, double>{};
       if (response.isSuccess) {
         final data = response.getData<Map<String, dynamic>>('data');
         final analytics = data?['analytics'] as List? ?? [];
 
-        final analysisOverTime = <String, double>{};
         for (final item in analytics) {
           final date = item['_id']?.toString() ?? '';
           final amount = (item['totalAmount'] as num?)?.toDouble() ?? 0;
           if (date.isNotEmpty) analysisOverTime[date] = amount;
         }
-
-        emit(state.copyWith(
-          analysisOverTime: analysisOverTime,
-          hasData: analysisOverTime.isNotEmpty,
-        ));
       }
+
+      var categoryAnalysis = state.categoryAnalysis;
+      var totalAmount = state.totalAmount;
+
+      final catResponse = await _api.get('/analytics/by-category');
+      if (catResponse.isSuccess) {
+        final catData = catResponse.getData<Map<String, dynamic>>('data');
+        final categories = catData?['categories'] as List? ?? [];
+
+        categoryAnalysis = <String, double>{};
+        for (final cat in categories) {
+          final name = cat['categoryName']?.toString() ?? 'Other';
+          final amount = (cat['totalAmount'] as num?)?.toDouble() ?? 0;
+          categoryAnalysis[name] = amount;
+        }
+
+        totalAmount = (catData?['grandTotal'] as num?)?.toDouble() ?? totalAmount;
+      }
+
+      emit(state.copyWith(
+        analysisOverTime: analysisOverTime.isNotEmpty
+            ? analysisOverTime
+            : state.analysisOverTime,
+        categoryAnalysis: categoryAnalysis,
+        totalAmount: totalAmount,
+        hasData: analysisOverTime.isNotEmpty || categoryAnalysis.isNotEmpty,
+      ));
     } catch (e) {
       print('⚠️ [AnalyticsBloc] Refresh failed: $e');
     }

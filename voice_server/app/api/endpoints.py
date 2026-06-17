@@ -291,7 +291,7 @@ async def analyze_voice(request: Request, file: UploadFile = File(...)):
             status_code=400,
             detail={
                 "error": "transcription_error",
-                "message": "Failed to transcribe audio"
+                "message": str(e) or "Failed to transcribe audio"
             }
         )
     except NLPProcessingError as e:

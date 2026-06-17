@@ -132,6 +132,7 @@ class _CategoriesPageContent extends StatefulWidget {
 class _CategoriesPageContentState extends State<_CategoriesPageContent> {
   DateTime? _fromDate;
   DateTime? _toDate;
+  List<dynamic> _cachedExpenses = [];
 
   @override
   void initState() {
@@ -869,11 +870,15 @@ class _CategoriesPageContentState extends State<_CategoriesPageContent> {
       builder: (context, categoryState) {
         return BlocBuilder<ExpenseBloc, ExpenseState>(
           builder: (context, state) {
+            if (state is ExpenseLoaded) {
+              _cachedExpenses = _filterByDate(state.expenses);
+            }
+
             final breakdown = _computeSpendingBreakdown(
               categoryState.customCategories,
               state is ExpenseLoaded
                   ? _filterByDate(state.expenses)
-                  : const [],
+                  : _cachedExpenses,
             );
             final grandTotal = breakdown.total;
 

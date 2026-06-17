@@ -30,7 +30,13 @@ class DeleteExpense extends ExpenseEvent {
 
 // Load expenses (for future Firebase integration)
 class LoadExpenses extends ExpenseEvent {
-  const LoadExpenses();
+  /// When true, keep showing current expenses while refreshing in the background.
+  final bool silent;
+
+  const LoadExpenses({this.silent = false});
+
+  @override
+  List<Object?> get props => [silent];
 }
 
 // Update expense
