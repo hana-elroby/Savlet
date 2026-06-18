@@ -157,9 +157,9 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/analysis_photo.png"
-  adaptive_icon_background: "#D5D7DA"
-  adaptive_icon_foreground: "assets/images/analysis_photo.png"
+  image_path: "assets/images/savlet_launcher_icon.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/images/savlet_launcher_icon.png"
 
 
 # Native Splash Screen Configuration

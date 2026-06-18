@@ -133,7 +133,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Notifications',
+                  'Offer Alerts',
                   style: GoogleFonts.inter(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -218,7 +218,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ),
             const SizedBox(height: 20),
             Text(
-              'No notifications',
+              'No offer alerts',
               style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -227,7 +227,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Expenses, reminders and alerts\nwill show up here from your account.',
+              'New personalized deals\nwill show up here when they arrive.',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 14,
@@ -368,29 +368,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   IconData _iconForType(String type) {
-    switch (type) {
-      case 'transaction':
-        return Icons.receipt_long_rounded;
-      case 'reminder':
-        return Icons.notifications_active_rounded;
-      case 'offer':
-        return Icons.local_offer_rounded;
-      default:
-        return Icons.info_outline_rounded;
-    }
+    return Icons.local_offer_rounded;
   }
 
   Color _colorForType(String type) {
-    switch (type) {
-      case 'transaction':
-        return NotificationColors.navy;
-      case 'reminder':
-        return const Color(0xFFF59E0B);
-      case 'offer':
-        return const Color(0xFF059669);
-      default:
-        return const Color(0xFF7C3AED);
-    }
+    return const Color(0xFF059669);
   }
 
   String _formatTime(DateTime time) {

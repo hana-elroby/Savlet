@@ -26,6 +26,7 @@ class NotificationApiService {
         ? raw
             .whereType<Map>()
             .map((e) => AppNotification.fromMap(Map<String, dynamic>.from(e)))
+            .where((n) => n.type == 'offer')
             .toList()
         : <AppNotification>[];
 
@@ -64,7 +65,7 @@ class NotificationApiService {
   Future<bool> create({
     required String title,
     required String body,
-    String type = 'system',
+    String type = 'offer',
     String? referenceId,
   }) async {
     final response = await _api.post('/notifications', body: {

@@ -20,8 +20,8 @@ const schema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["transaction", "reminder", "offer", "system"],
-      default: "system",
+      enum: ["offer"],
+      default: "offer",
     },
     isRead: {
       type: Boolean,

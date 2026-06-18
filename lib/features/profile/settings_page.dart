@@ -58,14 +58,14 @@ class _SettingsPageState extends State<SettingsPage> {
                         _actionTile(Icons.music_note_outlined, 'Default sound',
                             _defaultSound.label, _showSoundPicker),
                         const Divider(height: 1, indent: 16, endIndent: 16),
-                        _actionTile(Icons.notifications_active_outlined, 'Test notification',
-                            'Send a sample alert', () async {
+                        _actionTile(Icons.local_offer_outlined, 'Test offer alert',
+                            'Send a sample offer notification', () async {
                           HapticFeedback.lightImpact();
                           await NotificationService().showTestNotification();
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content: Text('Test notification sent'),
+                                content: Text('Test offer alert sent'),
                                 backgroundColor: Color(0xFF10B981),
                               ),
                             );

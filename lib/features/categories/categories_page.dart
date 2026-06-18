@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
+import '../home/bloc/analytics_bloc.dart';
+import '../home/bloc/analytics_state.dart';
 import '../home/bloc/expense_bloc.dart';
 import '../home/bloc/expense_state.dart';
 import '../items/items_page.dart';
@@ -270,19 +272,23 @@ class _CategoriesPageContentState extends State<_CategoriesPageContent> {
   }
 
   Widget _buildSummaryCard() {
-    return BlocBuilder<ExpenseBloc, ExpenseState>(
-      builder: (context, state) {
-        var total = 0.0;
-        var activeCount = 0;
-        if (state is ExpenseLoaded && state.hasData) {
-          final categoryState = context.read<CategoryBloc>().state;
-          final breakdown = _computeSpendingBreakdown(
-            categoryState.customCategories,
-            _filterByDate(state.expenses),
-          );
-          total = breakdown.total;
-          activeCount = breakdown.activeCount;
-        }
+    return BlocBuilder<AnalyticsBloc, AnalyticsState>(
+      builder: (context, analyticsState) {
+        return BlocBuilder<ExpenseBloc, ExpenseState>(
+          builder: (context, state) {
+            var total = 0.0;
+            var activeCount = 0;
+            if (state is ExpenseLoaded && state.hasData) {
+              final categoryState = context.read<CategoryBloc>().state;
+              final breakdown = _computeSpendingBreakdown(
+                categoryState.customCategories,
+                _filterByDate(state.expenses),
+              );
+              total = !_isDateFiltered && analyticsState.totalAmount > 0
+                  ? analyticsState.totalAmount
+                  : breakdown.total;
+              activeCount = breakdown.activeCount;
+            }
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.all(18),
@@ -306,7 +312,7 @@ class _CategoriesPageContentState extends State<_CategoriesPageContent> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Total spending',
+                      _isDateFiltered ? 'Filtered spending' : 'Total spending',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: Colors.white.withValues(alpha: 0.75),
@@ -314,7 +320,7 @@ class _CategoriesPageContentState extends State<_CategoriesPageContent> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${total.toStringAsFixed(0)} EGP',
+                      '${_formatAmount(total)} EGP',
                       style: GoogleFonts.inter(
                         fontSize: 26,
                         fontWeight: FontWeight.w800,
@@ -353,8 +359,29 @@ class _CategoriesPageContentState extends State<_CategoriesPageContent> {
             ],
           ),
         );
+          },
+        );
       },
     );
+  }
+
+  String _formatAmount(double value) {
+    final fixed = value.toStringAsFixed(
+      value.truncateToDouble() == value ? 0 : 2,
+    );
+    final parts = fixed.split('.');
+    final intPart = parts[0];
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < intPart.length; i++) {
+      if (i > 0 && (intPart.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(intPart[i]);
+    }
+
+    if (parts.length > 1 && parts[1] != '0' && parts[1] != '00') {
+      return '$buffer.${parts[1]}';
+    }
+    return buffer.toString();
   }
 
   Widget _buildDateCard() {

@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -250,7 +252,7 @@ class _ItemsPageContentState extends State<_ItemsPageContent>
         .toList()
       ..sort((a, b) =>
           (b['amount'] as double).compareTo(a['amount'] as double));
-    return data.take(5).toList();
+    return data;
   }
 
   Widget _buildHeader(BuildContext context) {
@@ -482,7 +484,7 @@ class _ItemsPageContentState extends State<_ItemsPageContent>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Top items by spend',
+            'All items by spend',
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -491,7 +493,7 @@ class _ItemsPageContentState extends State<_ItemsPageContent>
           ),
           const SizedBox(height: 4),
           Text(
-            'Tap a bar to filter the list',
+            'Swipe horizontally to see all bars',
             style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
           ),
           const SizedBox(height: 16),
@@ -971,6 +973,7 @@ class _VerticalColumnChart extends StatelessWidget {
 
   static const _barAreaHeight = 132.0;
   static const _barWidth = 20.0;
+  static const _columnWidth = 62.0;
   static const _nameRowHeight = 36.0;
   static const _labelSpace = 18.0;
 
@@ -991,35 +994,40 @@ class _VerticalColumnChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final maxAmount = data.first['amount'] as double;
 
-    return SizedBox(
-      height: _barAreaHeight + _nameRowHeight,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: List.generate(data.length, (i) {
-          final item = data[i];
-          final name = item['item'] as String;
-          final amount = item['amount'] as double;
-          final qty = item['quantity'] as int? ?? 1;
-          final isSelected = selectedItem == name;
-          final color = isSelected
-              ? const Color(0xFF059669)
-              : categoryChartColors[i % categoryChartColors.length];
+    final chartWidth = math.max(
+      MediaQuery.sizeOf(context).width - 76,
+      data.length * _columnWidth,
+    );
 
-          final maxBar = _barAreaHeight - _labelSpace;
-          final fraction = data.length == 1
-              ? 1.0
-              : (maxAmount > 0 ? (amount / maxAmount).clamp(0.12, 1.0) : 1.0);
-          final barHeight = maxBar * fraction;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: SizedBox(
+        width: chartWidth,
+        height: _barAreaHeight + _nameRowHeight,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: List.generate(data.length, (i) {
+            final item = data[i];
+            final name = item['item'] as String;
+            final amount = item['amount'] as double;
+            final qty = item['quantity'] as int? ?? 1;
+            final isSelected = selectedItem == name;
+            final color = isSelected
+                ? const Color(0xFF059669)
+                : categoryChartColors[i % categoryChartColors.length];
 
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => onTap(name),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: i == 0 ? 0 : 2,
-                  right: i == data.length - 1 ? 0 : 2,
-                ),
+            final maxBar = _barAreaHeight - _labelSpace;
+            final fraction = data.length == 1
+                ? 1.0
+                : (maxAmount > 0 ? (amount / maxAmount).clamp(0.12, 1.0) : 1.0);
+            final barHeight = maxBar * fraction;
+
+            return SizedBox(
+              width: _columnWidth,
+              child: GestureDetector(
+                onTap: () => onTap(name),
+                behavior: HitTestBehavior.opaque,
                 child: Column(
                   children: [
                     SizedBox(
@@ -1109,9 +1117,9 @@ class _VerticalColumnChart extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }

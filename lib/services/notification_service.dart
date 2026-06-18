@@ -155,12 +155,12 @@ class NotificationService {
     await _notifications.cancelAll();
   }
 
-  // Show immediate notification (for testing)
+  // Show immediate offer notification (for testing)
   Future<void> showTestNotification() async {
     const androidDetails = AndroidNotificationDetails(
-      'test_channel',
-      'Test Notifications',
-      channelDescription: 'For testing notifications',
+      'offer_channel',
+      'Offer Notifications',
+      channelDescription: 'New personalized offers and deals',
       importance: Importance.high,
       priority: Priority.high,
     );
@@ -169,16 +169,17 @@ class NotificationService {
 
     await _notifications.show(
       0,
-      'Test Notification',
-      'This is a test notification!',
+      'New offer for you',
+      'Sample deal alert from Savlet.',
       details,
     );
 
     // Persist to backend inbox
     await NotificationApiService.instance.create(
-      title: 'Test Notification',
-      body: 'This is a test notification!',
-      type: 'system',
+      title: 'New offer for you',
+      body: 'Sample deal alert from Savlet.',
+      type: 'offer',
+      referenceId: 'offers:test:${DateTime.now().millisecondsSinceEpoch}',
     );
   }
 

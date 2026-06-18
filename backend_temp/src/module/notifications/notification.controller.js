@@ -5,7 +5,7 @@ import { createUserNotification, getUnreadCount } from "./notification.service.j
 
 export const getMyNotifications = catchError(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
-  const notifications = await Notification.find({ user: req.user._id })
+  const notifications = await Notification.find({ user: req.user._id, type: "offer" })
     .sort({ createdAt: -1 })
     .limit(limit)
     .lean();
@@ -27,7 +27,7 @@ export const getUnreadCountHandler = catchError(async (req, res) => {
 
 export const markAsRead = catchError(async (req, res, next) => {
   const notification = await Notification.findOneAndUpdate(
-    { _id: req.params.id, user: req.user._id },
+    { _id: req.params.id, user: req.user._id, type: "offer" },
     { isRead: true },
     { new: true }
   );
@@ -41,7 +41,7 @@ export const markAsRead = catchError(async (req, res, next) => {
 
 export const markAllAsRead = catchError(async (req, res) => {
   const result = await Notification.updateMany(
-    { user: req.user._id, isRead: false },
+    { user: req.user._id, type: "offer", isRead: false },
     { isRead: true }
   );
 
@@ -55,6 +55,7 @@ export const deleteNotification = catchError(async (req, res, next) => {
   const notification = await Notification.findOneAndDelete({
     _id: req.params.id,
     user: req.user._id,
+    type: "offer",
   });
 
   if (!notification) {
@@ -65,7 +66,7 @@ export const deleteNotification = catchError(async (req, res, next) => {
 });
 
 export const clearAllNotifications = catchError(async (req, res) => {
-  const result = await Notification.deleteMany({ user: req.user._id });
+  const result = await Notification.deleteMany({ user: req.user._id, type: "offer" });
 
   res.status(200).json({
     message: "All notifications cleared",
@@ -83,9 +84,15 @@ export const createNotification = catchError(async (req, res) => {
   const notification = await createUserNotification(req.user._id, {
     title,
     body,
-    type: type || "system",
+    type: type || "offer",
     referenceId: referenceId || null,
   });
+
+  if (!notification) {
+    return res.status(400).json({
+      message: "Only offer notifications are supported",
+    });
+  }
 
   res.status(201).json({ message: "Notification created", data: notification });
 });

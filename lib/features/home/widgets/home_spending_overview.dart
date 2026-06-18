@@ -56,7 +56,11 @@ class _HomeSpendingOverviewState extends State<HomeSpendingOverview> {
             final chartSource = hasLocalData
                 ? _analyticsFromExpenses(expenses)
                 : analyticsState.analysisOverTime;
-            final total = chartSource.values.fold<double>(0, (a, b) => a + b);
+            final total = analyticsState.totalAmount > 0
+                ? analyticsState.totalAmount
+                : hasLocalData
+                    ? (expenseState as ExpenseLoaded).totalExpenses
+                    : chartSource.values.fold<double>(0, (a, b) => a + b);
 
             return Container(
               width: double.infinity,
@@ -93,7 +97,7 @@ class _HomeSpendingOverviewState extends State<HomeSpendingOverview> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${total.toStringAsFixed(0)} EGP total',
+                              '${_formatAmount(total)} EGP total',
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -160,6 +164,25 @@ class _HomeSpendingOverviewState extends State<HomeSpendingOverview> {
       } catch (_) {}
     }
     return result;
+  }
+
+  String _formatAmount(double value) {
+    final fixed = value.toStringAsFixed(
+      value.truncateToDouble() == value ? 0 : 2,
+    );
+    final parts = fixed.split('.');
+    final intPart = parts[0];
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < intPart.length; i++) {
+      if (i > 0 && (intPart.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(intPart[i]);
+    }
+
+    if (parts.length > 1 && parts[1] != '0' && parts[1] != '00') {
+      return '$buffer.${parts[1]}';
+    }
+    return buffer.toString();
   }
 
   Widget _dayDetailCard(
