@@ -121,3 +121,13 @@ class SearchTransactions extends TransactionEvent {
   @override
   List<Object?> get props => [query];
 }
+
+// Replace local transaction list (used by unified sync)
+class ReplaceTransactionsLocally extends TransactionEvent {
+  final List<TransactionModel> transactions;
+
+  const ReplaceTransactionsLocally(this.transactions);
+
+  @override
+  List<Object?> get props => [transactions];
+}

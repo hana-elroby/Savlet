@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../../core/models/expense.dart';
 
 /// Item Model for persistence
 class CategoryItem {
@@ -201,5 +202,42 @@ class CategoryDataStore {
     final category = findCategory(categoryName);
     category?.removeItem(itemIndex);
     _saveData();
+  }
+
+  /// Rebuild all category items/totals from the canonical expense list.
+  static void rebuildFromExpenses(List<Expense> expenses) {
+    try {
+      final dataStore = CategoryDataStore();
+      for (final cat in dataStore.allCategories) {
+        cat.items.clear();
+        cat.totalAmount = 0;
+      }
+
+      for (final expense in expenses) {
+        final item = CategoryItem(
+          name: expense.title,
+          quantity: expense.quantity,
+          unitPrice: expense.amount,
+          date: expense.date,
+          source: expense.isVoiceInput ? 'voice' : 'manual',
+        );
+
+        var cat = dataStore.findCategory(expense.category);
+        if (cat == null) {
+          cat = CategoryData(
+            name: expense.category,
+            icon: Icons.category,
+            isMain: false,
+          );
+          dataStore._customCategories.add(cat);
+        }
+        cat.addItem(item);
+      }
+
+      dataStore._saveData();
+      print('✅ CategoryDataStore rebuilt from ${expenses.length} expenses');
+    } catch (e) {
+      print('⚠️ CategoryDataStore rebuild failed: $e');
+    }
   }
 }

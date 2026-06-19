@@ -4,15 +4,21 @@ import 'transaction_state.dart';
 import '../models/transaction_model.dart';
 import '../../../core/services/transaction_api_service.dart';
 import '../../../core/services/transaction_local_store.dart';
+import '../../../core/services/expense_sync_service.dart';
 import '../../../core/services/auth_api_service.dart';
 
 class TransactionBloc extends Bloc<TransactionEvent, TransactionState> {
+  static TransactionBloc? instance;
+
   final TransactionApiService _service = TransactionApiService.instance;
 
   TransactionBloc() : super(const TransactionState()) {
+    instance = this;
+    ExpenseSyncService.instance.registerTransactionBloc(this);
     on<LoadTransactions>(_onLoad);
     on<DeleteTransaction>(_onDelete);
     on<AddTransaction>(_onAdd);
+    on<ReplaceTransactionsLocally>(_onReplaceTransactionsLocally);
   }
 
   Future<void> _onLoad(
@@ -61,18 +67,23 @@ class TransactionBloc extends Bloc<TransactionEvent, TransactionState> {
 
   Future<void> _onDelete(
       DeleteTransaction event, Emitter<TransactionState> emit) async {
-    final updated = state.transactions
-        .where((t) => t.id != event.transactionId)
-        .toList();
-    await TransactionLocalStore.save(updated);
-    emit(state.copyWith(
-        status: TransactionStatus.loaded, transactions: updated));
+    await ExpenseSyncService.instance.deleteEverywhere(event.transactionId);
+  }
 
-    if (AuthApiService.instance.isLoggedIn) {
-      try {
-        await _service.deleteTransaction(event.transactionId);
-      } catch (_) {}
+  Future<void> _onReplaceTransactionsLocally(
+      ReplaceTransactionsLocally event, Emitter<TransactionState> emit) async {
+    emit(state.copyWith(
+      status: TransactionStatus.loaded,
+      transactions: event.transactions,
+    ));
+  }
+
+  @override
+  Future<void> close() {
+    if (identical(TransactionBloc.instance, this)) {
+      TransactionBloc.instance = null;
     }
+    return super.close();
   }
 
   Future<void> _onAdd(AddTransaction event, Emitter<TransactionState> emit) async {

@@ -54,10 +54,11 @@ class OcrCategoryClassifier {
       'حليب', 'milk', 'bread', 'خبز', 'جبن', 'cheese', 'بيض', 'egg', 'لحم', 'meat',
       'دجاج', 'chicken', 'rice', 'أرز', 'ارز', 'شاورما', 'shawarma', 'burger',
       'pizza', 'kebab', 'كباب', 'وجبة', 'meal', 'ice cream', 'ايس كريم', 'آيس',
-      'عصير', 'juice', 'سnaكس', 'snack', 'chocolate', 'حلو', 'candy',
+      'عصير', 'juice', 'سناكس', 'snack', 'chocolate', 'حلو', 'candy',
       'مكرونة', 'pasta', 'زيت', 'oil', 'سكر', 'sugar', 'قهوة', 'coffee',
-      'شاي', 'tea', 'مطعم', 'restaurant', 'كافيه', 'cafe', 'café', 'فطار',
+      'شاي', 'tea', 'مطعم', 'restaurant', 'كافيه', 'كافي', 'cafe', 'café', 'فطار',
       'غدا', 'عشا', 'طعام', 'أكل', 'اكل', 'food', 'drink', 'مشروب',
+      'سوبر ماركت', 'ماركت', 'هايبر', 'hypermarket', 'supermarket', 'grocery',
     ])) {
       return 'Food & Drinks';
     }
@@ -66,6 +67,7 @@ class OcrCategoryClassifier {
       'دواء', 'medicine', 'pharmacy', 'صيدل', 'vitamin', 'فيتام', 'tablet',
       'حبوب', 'شراب', 'syrup', 'prescription', 'dose', 'mg', 'ml',
       'مستشف', 'hospital', 'clinic', 'doctor', 'دكتور', 'mask', 'كمام',
+      'panadol', 'paracetamol', 'capsule', 'كبسول', 'مرهم', 'cream',
     ])) {
       return 'Health';
     }
@@ -73,7 +75,7 @@ class OcrCategoryClassifier {
     if (_any(t, [
       'بنزين', 'سولار', 'ديزل', 'وقود', 'fuel', 'petrol', 'diesel', 'gasoline',
       'تاكسي', 'taxi', 'uber', 'أوبر', 'كريم', 'careem', 'أجرة', 'مواصلات',
-      'transport', 'parking', 'موقف',
+      'transport', 'parking', 'موقف', 'محطة', 'gas station',
     ])) {
       return 'Transport';
     }

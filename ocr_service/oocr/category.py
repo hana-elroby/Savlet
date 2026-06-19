@@ -26,12 +26,17 @@ def classify(invoice: Invoice) -> str:
     """Resolve final category for the invoice.
 
     Order of precedence:
-    1. Strong keyword rule hit (e.g. 'بنزين' in items → fuel).
+    1. Strong keyword rule hit (e.g. 'بنزين' in store/items → fuel).
     2. The category the LLM assigned in raw_invoice (already on the
        invoice when this is called).
     3. 'other' as a last resort.
     """
-    parts = [item.name for item in invoice.items if item.name]
+    parts = [
+        invoice.store_name or "",
+        invoice.place or "",
+        invoice.details or "",
+        *(item.name for item in invoice.items if item.name),
+    ]
     blob = " | ".join(parts)
 
     rule_hit = _rules_match(blob) if blob else None

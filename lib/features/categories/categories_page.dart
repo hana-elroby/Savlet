@@ -284,9 +284,7 @@ class _CategoriesPageContentState extends State<_CategoriesPageContent> {
                 categoryState.customCategories,
                 _filterByDate(state.expenses),
               );
-              total = !_isDateFiltered && analyticsState.totalAmount > 0
-                  ? analyticsState.totalAmount
-                  : breakdown.total;
+              total = breakdown.total;
               activeCount = breakdown.activeCount;
             }
         return Container(

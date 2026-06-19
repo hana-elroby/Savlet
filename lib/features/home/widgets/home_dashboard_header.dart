@@ -59,14 +59,15 @@ class _HomeDashboardHeaderState extends State<HomeDashboardHeader> {
                 final firstName =
                     (displayName.isEmpty ? 'User' : displayName).split(' ').first;
 
-                var total = analytics.totalAmount;
-                if (total <= 0 && expenseState is ExpenseLoaded) {
+                var total = 0.0;
+                if (expenseState is ExpenseLoaded) {
                   total = expenseState.totalExpenses;
-                }
-                if (total <= 0 && txState.transactions.isNotEmpty) {
+                } else if (txState.transactions.isNotEmpty) {
                   total = txState.transactions
                       .where((t) => t.isExpense)
                       .fold(0.0, (sum, t) => sum + t.amount);
+                } else {
+                  total = analytics.totalAmount;
                 }
 
                 return Column(

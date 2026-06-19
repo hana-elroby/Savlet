@@ -158,16 +158,16 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/savlet_launcher_icon.png"
-  adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/images/savlet_launcher_icon.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/savlet_launcher_foreground.png"
+  adaptive_icon_foreground_inset: 10
 
 
-# Native Splash Screen Configuration
+# Native launch — match auth screen; no logo page before Flutter loads
 flutter_native_splash:
-  color: "#D5D7DA"
-  image: "assets/images/analysis_photo.png"
+  color: "#F0F4FA"
   android: true
   ios: true
   android_12:
-    color: "#D5D7DA"
-    image: "assets/images/analysis_photo.png"
+    color: "#F0F4FA"
+    icon_background_color: "#F0F4FA"

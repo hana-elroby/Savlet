@@ -18,6 +18,7 @@ class AuthScaffold extends StatelessWidget {
   final String? title;
   final String? subtitle;
   final bool showBack;
+  final Widget? headerLogo;
   final Widget child;
   final Widget? topTrailing;
 
@@ -27,6 +28,7 @@ class AuthScaffold extends StatelessWidget {
     this.title,
     this.subtitle,
     this.showBack = true,
+    this.headerLogo,
     required this.child,
     this.topTrailing,
   });
@@ -50,6 +52,10 @@ class AuthScaffold extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (headerLogo != null) ...[
+                          Center(child: headerLogo!),
+                          const SizedBox(height: 16),
+                        ],
                         if (badge != null ||
                             title != null ||
                             subtitle != null) ...[
@@ -334,10 +340,12 @@ class AuthPrimaryButton extends StatelessWidget {
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: loading ? null : () {
-          HapticFeedback.lightImpact();
-          onPressed?.call();
-        },
+        onPressed: loading
+            ? null
+            : () {
+                HapticFeedback.lightImpact();
+                onPressed?.call();
+              },
         style: ElevatedButton.styleFrom(
           backgroundColor: secondary ? AuthColors.navyDark : AuthColors.navy,
           disabledBackgroundColor: AuthColors.navy.withValues(alpha: 0.5),
@@ -363,6 +371,100 @@ class AuthPrimaryButton extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
+      ),
+    );
+  }
+}
+
+/// Gentle floating animation for welcome-screen auth buttons.
+class AuthAnimatedPrimaryButton extends StatefulWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool secondary;
+  final Duration delay;
+
+  const AuthAnimatedPrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.secondary = false,
+    this.delay = Duration.zero,
+  });
+
+  @override
+  State<AuthAnimatedPrimaryButton> createState() =>
+      _AuthAnimatedPrimaryButtonState();
+}
+
+class _AuthAnimatedPrimaryButtonState extends State<AuthAnimatedPrimaryButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _offsetY;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    );
+    _offsetY = Tween<double>(begin: 0, end: -4).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _scale = Tween<double>(begin: 1, end: 1.015).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    Future.delayed(widget.delay, () {
+      if (mounted) _controller.repeat(reverse: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _offsetY.value),
+          child: Transform.scale(
+            scale: _scale.value,
+            child: child,
+          ),
+        );
+      },
+      child: AuthPrimaryButton(
+        label: widget.label,
+        secondary: widget.secondary,
+        onPressed: widget.onPressed,
+      ),
+    );
+  }
+}
+
+/// Official Google "G" from bundled asset (full logo, not clipped).
+class GoogleLogoIcon extends StatelessWidget {
+  final double size;
+
+  const GoogleLogoIcon({super.key, this.size = 22});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Image.asset(
+        'assets/images/GoogleIcon.png',
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.high,
       ),
     );
   }
@@ -422,12 +524,8 @@ class AuthGoogleButton extends StatelessWidget {
           : Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.g_mobiledata_rounded,
-                  size: 28,
-                  color: Color(0xFF4285F4),
-                ),
-                const SizedBox(width: 8),
+                const GoogleLogoIcon(size: 22),
+                const SizedBox(width: 10),
                 Text(
                   'Continue with Google',
                   style: GoogleFonts.inter(

@@ -85,7 +85,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
                   parent: BouncingScrollPhysics(),
                 ),
                 slivers: [
-                  SliverToBoxAdapter(child: _buildHeader(all.length)),
+                  SliverToBoxAdapter(child: _buildHeader(all.length, thisMonth)),
                   SliverToBoxAdapter(
                     child: _buildSummaryCard(
                       totalSpent: totalSpent,
@@ -141,7 +141,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
     );
   }
 
-  Widget _buildHeader(int count) {
+  Widget _buildHeader(int totalCount, int monthCount) {
+    final monthLabel = monthYearLabel(DateTime.now());
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
       child: Row(
@@ -180,7 +181,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$count recorded · ${monthYearLabel(DateTime.now())}',
+                  '$totalCount total · $monthCount in $monthLabel',
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     color: const Color(0xFF64748B),
@@ -285,7 +286,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
             Row(
               children: [
                 _SummaryStat(
-                  label: 'Transactions',
+                  label: 'Total',
                   value: count.toString(),
                 ),
                 Container(

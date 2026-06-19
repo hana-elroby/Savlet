@@ -57,7 +57,6 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      badge: 'Account',
       title: 'Welcome back',
       subtitle: 'Sign in to continue tracking your spending',
       child: AuthCard(

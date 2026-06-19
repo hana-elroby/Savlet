@@ -78,7 +78,6 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      badge: 'Account',
       title: 'Create account',
       subtitle: 'Start tracking expenses in seconds',
       child: AuthCard(

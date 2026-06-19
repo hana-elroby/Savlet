@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/models/expense.dart';
 import '../../../core/services/websocket_service.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/local_storage_service.dart';
@@ -187,6 +188,43 @@ class AnalyticsBloc extends Cubit<AnalyticsState> {
     } catch (e) {
       print('⚠️ [AnalyticsBloc] Refresh failed: $e');
     }
+  }
+
+  /// Optimistically update analytics from the canonical local expense list.
+  ///
+  /// This keeps Home, Categories, and Analysis in sync immediately after a
+  /// local change while the backend refresh catches up.
+  void applyExpenses(List<Expense> expenses) {
+    final analysisOverTime = <String, double>{};
+    final categoryAnalysis = <String, double>{};
+    var totalAmount = 0.0;
+
+    for (final expense in expenses) {
+      final dateKey = _dateKey(expense.date);
+      analysisOverTime[dateKey] =
+          (analysisOverTime[dateKey] ?? 0) + expense.amount;
+
+      final category = expense.category.trim().isEmpty
+          ? 'Other'
+          : expense.category.trim();
+      categoryAnalysis[category] =
+          (categoryAnalysis[category] ?? 0) + expense.amount;
+
+      totalAmount += expense.amount;
+    }
+
+    emit(state.copyWith(
+      analysisOverTime: analysisOverTime,
+      categoryAnalysis: categoryAnalysis,
+      totalAmount: totalAmount,
+      hasData: expenses.isNotEmpty,
+    ));
+  }
+
+  String _dateKey(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
   }
 
   @override

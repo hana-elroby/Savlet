@@ -39,8 +39,6 @@ class _OcrResultsDialogState extends State<OcrResultsDialog> {
   late DateTime _selectedDate;
   late TimeOfDay _selectedTime;
   late final TextEditingController _storeNameController;
-  late final TextEditingController _placeController;
-  late final TextEditingController _detailsController;
   final List<TextEditingController> _descriptionControllers = [];
 
   @override
@@ -55,8 +53,6 @@ class _OcrResultsDialogState extends State<OcrResultsDialog> {
   @override
   void dispose() {
     _storeNameController.dispose();
-    _placeController.dispose();
-    _detailsController.dispose();
     for (final c in _descriptionControllers) {
       c.dispose();
     }
@@ -73,8 +69,6 @@ class _OcrResultsDialogState extends State<OcrResultsDialog> {
   void _initReceiptDetails() {
     final inv = widget.invoice;
     _storeNameController = TextEditingController(text: inv.storeName?.trim() ?? '');
-    _placeController = TextEditingController(text: inv.place?.trim() ?? '');
-    _detailsController = TextEditingController(text: inv.details?.trim() ?? '');
   }
 
   DateTime? _parseInvoiceDate(String? raw) {
@@ -118,15 +112,8 @@ class _OcrResultsDialogState extends State<OcrResultsDialog> {
 
   String? _buildReceiptNotes() {
     final store = _storeNameController.text.trim();
-    final place = _placeController.text.trim();
-    final details = _detailsController.text.trim();
-    if (store.isEmpty && place.isEmpty && details.isEmpty) return null;
-
-    final lines = <String>[];
-    if (store.isNotEmpty) lines.add('Store: $store');
-    if (place.isNotEmpty) lines.add('Place: $place');
-    if (details.isNotEmpty) lines.add(details);
-    return lines.join('\n');
+    if (store.isEmpty) return null;
+    return 'Store: $store';
   }
 
   void _initItemControllers() {
@@ -165,6 +152,7 @@ class _OcrResultsDialogState extends State<OcrResultsDialog> {
 
   List<String> _categoryOptions(CategoryBloc bloc) {
     const extras = [
+      'Food & Drinks',
       'Food & Drink',
       'Shopping',
       'Bills',
@@ -432,21 +420,6 @@ class _OcrResultsDialogState extends State<OcrResultsDialog> {
                 label: 'Store name',
                 hint: 'e.g. Carrefour, Talabat…',
                 icon: Icons.storefront_outlined,
-              ),
-              const SizedBox(height: 8),
-              _buildReceiptTextField(
-                controller: _placeController,
-                label: 'Place',
-                hint: 'Branch, city, or address',
-                icon: Icons.location_on_outlined,
-              ),
-              const SizedBox(height: 8),
-              _buildReceiptTextField(
-                controller: _detailsController,
-                label: 'Details',
-                hint: 'Payment method, receipt no., notes…',
-                icon: Icons.notes_outlined,
-                maxLines: 2,
               ),
               const SizedBox(height: 12),
               Container(

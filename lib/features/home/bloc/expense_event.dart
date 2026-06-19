@@ -54,5 +54,15 @@ class ClearAllExpenses extends ExpenseEvent {
   const ClearAllExpenses();
 }
 
+// Replace local expense list (used by unified sync)
+class ReplaceExpensesLocally extends ExpenseEvent {
+  final List<Expense> expenses;
+
+  const ReplaceExpensesLocally(this.expenses);
+
+  @override
+  List<Object?> get props => [expenses];
+}
+
 
 

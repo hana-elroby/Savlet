@@ -1,11 +1,11 @@
 ﻿import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/models/expense.dart';
 import '../../../core/models/transaction_model.dart' as core;
 import '../../../core/services/transaction_api_service.dart';
 import '../../../core/services/transaction_local_store.dart';
+import '../../../core/services/expense_sync_service.dart';
 import '../../../core/services/item_api_service.dart';
 import '../../../core/services/category_api_service.dart';
 import '../../../core/services/api_service.dart';
@@ -18,6 +18,8 @@ import 'expense_event.dart';
 import 'expense_state.dart';
 
 class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
+  static ExpenseBloc? instance;
+
   static const String _storageKey = 'expenses_data';
   final SimpleStorage _storage = SimpleStorage();
   final TransactionApiService _transactionApi = TransactionApiService.instance;
@@ -25,11 +27,14 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
   StreamSubscription<Map<String, dynamic>>? _wsSubscription;
 
   ExpenseBloc() : super(const ExpenseLoaded([])) {
+    instance = this;
+    ExpenseSyncService.instance.registerExpenseBloc(this);
     on<AddExpense>(_onAddExpense);
     on<DeleteExpense>(_onDeleteExpense);
     on<UpdateExpense>(_onUpdateExpense);
     on<LoadExpenses>(_onLoadExpenses);
     on<ClearAllExpenses>(_onClearAllExpenses);
+    on<ReplaceExpensesLocally>(_onReplaceExpensesLocally);
 
     // Auto-load on creation
     add(const LoadExpenses());
@@ -50,6 +55,9 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
 
   @override
   Future<void> close() {
+    if (identical(ExpenseBloc.instance, this)) {
+      ExpenseBloc.instance = null;
+    }
     _wsSubscription?.cancel();
     return super.close();
   }
@@ -90,11 +98,10 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
     }
   }
 
-  /// Remove expense from TransactionBloc's local storage
-  Future<void> _removeFromTransactions(String expenseId) async {
-    try {
-      await TransactionLocalStore.removeById(expenseId);
-    } catch (_) {}
+  Future<void> _onReplaceExpensesLocally(
+      ReplaceExpensesLocally event, Emitter<ExpenseState> emit) async {
+    emit(ExpenseLoaded(event.expenses));
+    await _saveLocal(event.expenses);
   }
 
   // ─── Event handlers ────────────────────────────────────────────────────────
@@ -183,33 +190,7 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
 
   Future<void> _onDeleteExpense(
       DeleteExpense event, Emitter<ExpenseState> emit) async {
-    if (state is! ExpenseLoaded) return;
-    final current = state as ExpenseLoaded;
-
-    final updated =
-        current.expenses.where((e) => e.id != event.expenseId).toList();
-    emit(ExpenseLoaded(updated));
-    await _saveLocal(updated);
-
-    // Remove from TransactionBloc storage too
-    await _removeFromTransactions(event.expenseId);
-
-    // Delete from backend if logged in
-    final isLoggedIn = await AuthApiService.instance.isAuthenticated();
-    if (!isLoggedIn) return;
-
-    // Use syncId (backend _id) if available, otherwise skip
-    // The Expense model doesn't have syncId yet — we'll use the local id as fallback
-    try {
-      final result = await _transactionApi.deleteTransaction(event.expenseId);
-      if (result.isSuccess) {
-        print('✅ Expense deleted from backend: ${event.expenseId}');
-      } else {
-        print('⚠️ Backend delete failed (may not exist on backend): ${result.message}');
-      }
-    } catch (e) {
-      print('⚠️ Backend delete error: $e');
-    }
+    await ExpenseSyncService.instance.deleteEverywhere(event.expenseId);
   }
 
   Future<void> _onUpdateExpense(
@@ -271,8 +252,8 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
 
             emit(ExpenseLoaded(expenses));
             await _saveLocal(expenses);
-            // Populate CategoryDataStore from backend expenses
-            _populateCategoryDataStore(expenses);
+            CategoryDataStore.rebuildFromExpenses(expenses);
+            await ExpenseSyncService.instance.applyTransactionList(deduped);
             print('✅ Loaded ${expenses.length} expenses from backend');
             return;
           }
@@ -308,40 +289,4 @@ class ExpenseBloc extends Bloc<ExpenseEvent, ExpenseState> {
   void refreshExpenses({bool silent = true}) =>
       add(LoadExpenses(silent: silent));
   void clearAllExpenses() => add(ClearAllExpenses());
-
-  /// Rebuild CategoryDataStore from a list of expenses (called after backend load)
-  void _populateCategoryDataStore(List<Expense> expenses) {
-    try {
-      final dataStore = CategoryDataStore();
-      // Clear existing items from all categories first
-      for (final cat in dataStore.allCategories) {
-        cat.items.clear();
-        cat.totalAmount = 0;
-      }
-      // Re-add all expenses as items
-      for (final expense in expenses) {
-        final item = CategoryItem(
-          name: expense.title,
-          quantity: expense.quantity,
-          unitPrice: expense.amount,
-          date: expense.date,
-          source: expense.isVoiceInput ? 'voice' : 'manual',
-        );
-        // Find or create category
-        var cat = dataStore.findCategory(expense.category);
-        if (cat == null) {
-          cat = CategoryData(
-            name: expense.category,
-            icon: Icons.category,
-            isMain: false,
-          );
-          dataStore.addCustomCategory(cat);
-        }
-        cat.addItem(item);
-      }
-      print('✅ CategoryDataStore populated with ${expenses.length} expenses');
-    } catch (e) {
-      print('⚠️ CategoryDataStore population failed: $e');
-    }
-  }
 }

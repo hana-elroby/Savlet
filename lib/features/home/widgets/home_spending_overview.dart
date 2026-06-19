@@ -56,10 +56,10 @@ class _HomeSpendingOverviewState extends State<HomeSpendingOverview> {
             final chartSource = hasLocalData
                 ? _analyticsFromExpenses(expenses)
                 : analyticsState.analysisOverTime;
-            final total = analyticsState.totalAmount > 0
-                ? analyticsState.totalAmount
-                : hasLocalData
-                    ? (expenseState as ExpenseLoaded).totalExpenses
+            final total = hasLocalData
+                ? (expenseState as ExpenseLoaded).totalExpenses
+                : analyticsState.totalAmount > 0
+                    ? analyticsState.totalAmount
                     : chartSource.values.fold<double>(0, (a, b) => a + b);
 
             return Container(

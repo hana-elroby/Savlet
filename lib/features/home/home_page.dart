@@ -63,13 +63,10 @@ class HomePage extends StatelessWidget {
     return BlocListener<ExpenseBloc, ExpenseState>(
 
         listenWhen: (prev, curr) {
-
           if (curr is! ExpenseLoaded) return false;
-
           if (prev is! ExpenseLoaded) return true;
-
-          return curr.expenses.length != prev.expenses.length;
-
+          // Reload transactions only when items are added — deletes are synced centrally.
+          return curr.expenses.length > prev.expenses.length;
         },
 
         listener: (context, _) {
